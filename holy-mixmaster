@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HOLY MIXMASTER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f2ec;
+    --panel:#ffffff;
+    --ink:#16181d;
+    --muted:#9a9ea7;
+    --line:#e4e3dc;
+    --accent:#1fd98f;   /* flavor accent, JS overrides */
+    --accent-2:#1fd98f;
+    --perfect:#16a34a;
+    --bad:#e5484d;
+    --gold:#e0a400;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Sora',system-ui,sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    min-height:100dvh;
+    user-select:none;
+  }
+  #stage{
+    position:relative;
+    width:min(440px,100vw);
+    height:min(820px,100dvh);
+    background:var(--bg);
+    display:flex;flex-direction:column;
+    padding:22px 22px 28px;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud{display:flex;justify-content:space-between;align-items:flex-start;z-index:5;}
+  .wordmark{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;letter-spacing:-.04em;font-size:26px;line-height:.9;color:var(--ink);}
+  .tag{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:5px;}
+  .logo{height:28px;width:auto;display:block;}
+  .stat{text-align:right;}
+  .stat .k{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);}
+  .stat .v{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:30px;line-height:1;color:var(--ink);}
+
+  .timerwrap{margin:16px 0 4px;height:6px;border-radius:99px;background:var(--line);overflow:hidden;}
+  .timerbar{height:100%;width:100%;background:var(--accent);transition:width .1s linear, background .4s;}
+
+  /* ---------- PLAY AREA ---------- */
+  .play{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;position:relative;}
+  .order{text-align:center;}
+  .order .lbl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+  .order .flavor{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:23px;letter-spacing:-.02em;color:var(--ink);display:flex;align-items:center;gap:9px;justify-content:center;margin-top:2px;}
+  .order .flavor::before{content:"";width:13px;height:13px;border-radius:50%;background:var(--accent);transition:background .3s;}
+
+  .speed{display:flex;align-items:center;gap:8px;height:14px;}
+  .speed .slabel{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);}
+  .speed .dots{display:flex;gap:5px;}
+  .speed .dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .2s, transform .2s;}
+  .speed .dot.on{background:var(--accent);transform:scale(1.1);}
+  .speed .dot.hot{background:var(--bad);}
+
+  .glass{
+    position:relative;width:160px;height:272px;
+    border:3px solid var(--line);
+    border-top:none;
+    border-radius:12px 12px 22px 22px / 8px 8px 34px 34px;
+    background:var(--panel);
+    overflow:hidden;
+  }
+  .glass.golden{border-color:var(--gold);}
+  .liquid{
+    position:absolute;left:0;right:0;bottom:0;height:0%;
+    background:var(--accent);
+  }
+  .liquid::before{ /* flat foam line */
+    content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#ffffff66;
+  }
+  /* powder layer at the bottom of the glass */
+  .powder{position:absolute;left:0;right:0;bottom:0;height:0%;background:color-mix(in srgb,var(--accent) 75%,#000 16%);transition:height .4s ease;}
+  .pdrop{position:absolute;top:6%;width:6px;height:6px;border-radius:1px;background:var(--accent);z-index:1;animation:pdrop .55s ease-in forwards;}
+  @keyframes pdrop{from{transform:translateY(-6px);opacity:1}to{transform:translateY(230px);opacity:.25}}
+  /* HOLY sachet (stick pack) that tips in to pour */
+  .glasswrap{position:relative;display:flex;flex-direction:column;align-items:center;padding-top:48px;}
+  .sachet{
+    position:absolute;top:4px;left:50%;width:40px;height:76px;z-index:6;
+    transform:translateX(-50%) rotate(0deg);transform-origin:50% 14%;
+    opacity:0;transition:transform .3s ease, opacity .2s;
+  }
+  .sachet svg{display:block;width:100%;height:100%;overflow:visible;}
+  .sachet.pour{opacity:1;transform:translateX(-58%) rotate(-24deg) translateY(2px);}
+  .target{position:absolute;left:-3px;right:-3px;height:0;border-top:2px dashed var(--ink);opacity:.32;z-index:3;}
+  .perfectzone{position:absolute;left:0;right:0;background:#16a34a1f;border-block:2px solid var(--perfect);z-index:2;}
+  .perfectzone::after{content:"PERFECT";position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:8px;letter-spacing:.16em;color:var(--perfect);font-weight:700;}
+  .shine{position:absolute;top:10px;left:13px;width:10px;height:70%;border-radius:99px;background:#ffffff80;z-index:4;}
+  .bubble{position:absolute;border-radius:50%;background:#ffffffb0;z-index:1;animation:rise linear forwards;}
+  @keyframes rise{from{transform:translateY(0);opacity:.6}to{transform:translateY(-250px);opacity:0}}
+
+  .scoop{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);height:15px;}
+  .verdict{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:28px;height:36px;letter-spacing:-.02em;opacity:0;transform:translateY(6px);transition:.16s;}
+  .verdict.show{opacity:1;transform:none;}
+
+  .hint{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:12px;color:var(--muted);letter-spacing:.04em;animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.95}}
+
+  .combo{position:absolute;top:4px;right:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:16px;color:var(--accent);opacity:0;transition:.2s;}
+  .combo.show{opacity:1;}
+  .goldtag{position:absolute;top:4px;left:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:13px;color:var(--gold);opacity:0;transition:.2s;}
+  .goldtag.show{opacity:1;}
+
+  /* ---------- OVERLAYS ---------- */
+  .overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:30px;gap:14px;background:var(--bg);}
+  .overlay.hide{display:none;}
+  .logo-big{height:54px;width:auto;display:block;}
+  .big{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:44px;line-height:.92;letter-spacing:-.04em;color:var(--ink);}
+  .sub{color:var(--muted);font-size:14px;max-width:300px;line-height:1.55;}
+  .sub b{color:var(--ink);font-weight:600;}
+  .rules{font-size:13px;color:var(--muted);line-height:1.7;max-width:285px;}
+  .rules b{color:var(--ink);font-weight:600;}
+  .btn{
+    margin-top:6px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px;letter-spacing:.02em;
+    color:#fff;background:var(--ink);
+    border:none;border-radius:99px;padding:15px 42px;cursor:pointer;
+    transition:transform .12s ease, opacity .2s;
+  }
+  .btn:active{transform:scale(.95);}
+  .btn:hover{opacity:.88;}
+  .score{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:78px;line-height:.9;color:var(--ink);}
+  .scorelbl{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);}
+  .statrow{display:flex;gap:26px;margin-top:4px;}
+  .statrow div{font-size:13px;color:var(--muted);}
+  .statrow b{display:block;font-family:'Bricolage Grotesque',sans-serif;color:var(--ink);font-size:22px;font-weight:800;}
+  .eco{font-size:11px;color:var(--muted);letter-spacing:.04em;max-width:285px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px;margin-top:6px;}
+  .shake{animation:shk .3s;}
+  @keyframes shk{0%,100%{transform:none}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+  /* in-game controls */
+  .controls{display:none;justify-content:center;gap:10px;margin-top:6px;z-index:6;}
+  .controls.show{display:flex;}
+  .ctrl{
+    font-family:'Sora',sans-serif;font-weight:600;font-size:13px;letter-spacing:.02em;
+    background:transparent;border:1.5px solid var(--line);color:var(--muted);
+    border-radius:99px;padding:9px 20px;cursor:pointer;transition:.15s;
+  }
+  .ctrl:active{transform:scale(.95);}
+  .ctrl.finish{border-color:var(--ink);color:var(--ink);}
+  .ctrl.finish:hover{background:var(--ink);color:#fff;}
+  .ctrl.quit:hover{border-color:var(--bad);color:var(--bad);}
+  .ctrl.pause.on{border-color:var(--ink);color:var(--ink);font-weight:700;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="hud">
+    <div>
+      <!-- LOGO: put your logo image in the SAME folder as this file and name it "holy-logo.png"
+           (or change the src below to your filename). Until then, a "HOLY" wordmark shows. -->
+      <img class="logo" id="logoHud" alt="HOLY"
+           src="holy-logo.png"
+           onerror="this.outerHTML='&lt;div class=\'wordmark\'&gt;HOLY&lt;/div&gt;'">
+      <div class="tag">Mixmaster</div>
+    </div>
+    <div class="stat">
+      <div class="k">Focus</div>
+      <div class="v" id="scoreVal">0</div>
+    </div>
+  </div>
+
+  <div class="timerwrap"><div class="timerbar" id="timerbar"></div></div>
+
+  <div class="play" id="play">
+    <div class="combo" id="combo"></div>
+    <div class="goldtag" id="goldtag">★ GOLDEN ×2</div>
+    <div class="order">
+      <div class="lbl">Now mixing</div>
+      <div class="flavor" id="flavor">—</div>
+    </div>
+
+    <div class="speed" id="speedMeter">
+      <span class="slabel">Speed</span>
+      <div class="dots">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="dot"></span><span class="dot"></span>
+      </div>
+    </div>
+
+    <div class="glasswrap">
+      <div class="sachet" id="sachet">
+        <svg viewBox="0 0 40 76" aria-hidden="true">
+          <!-- crimped sealed top (the held end) -->
+          <rect x="6" y="2" width="28" height="9" rx="2" style="fill:#d2d1cb"/>
+          <g style="stroke:#a7a69f;stroke-width:1">
+            <line x1="11" y1="3" x2="11" y2="10"/><line x1="15" y1="3" x2="15" y2="10"/>
+            <line x1="20" y1="3" x2="20" y2="10"/><line x1="25" y1="3" x2="25" y2="10"/>
+            <line x1="29" y1="3" x2="29" y2="10"/>
+          </g>
+          <!-- packet body -->
+          <rect x="6" y="10" width="28" height="52" rx="3" style="fill:#ffffff;stroke:var(--ink);stroke-width:2"/>
+          <!-- flavor-framed white label with the HOLY logo (text shows as fallback) -->
+          <rect x="6" y="27" width="28" height="15" style="fill:#ffffff"/>
+          <rect x="6" y="27" width="28" height="2.4" style="fill:var(--accent)"/>
+          <rect x="6" y="39.6" width="28" height="2.4" style="fill:var(--accent)"/>
+          <text x="20" y="36" text-anchor="middle"
+                style="fill:var(--ink);font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:8px;letter-spacing:.3px">HOLY</text>
+          <image href="holy-logo.png" xlink:href="holy-logo.png"
+                 x="8" y="29.6" width="24" height="9" preserveAspectRatio="xMidYMid meet"/>
+          <!-- open mouth + torn bottom edge (powder pours from here) -->
+          <ellipse cx="20" cy="62" rx="8.5" ry="2.6" style="fill:var(--ink);opacity:.30"/>
+          <polyline points="6,62 10,68 14,62 18,68 22,62 26,68 30,62 34,68"
+                    style="fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round"/>
+        </svg>
+      </div>
+      <div class="glass" id="glass">
+        <div class="powder" id="powder"></div>
+        <div class="perfectzone" id="pzone"></div>
+        <div class="target" id="targetLine"></div>
+        <div class="liquid" id="liquid"></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+
+    <div class="scoop" id="scoop">stop on the line • don't overflow</div>
+    <div class="verdict" id="verdict"></div>
+    <div class="hint" id="hint">tap / space to stop the pour</div>
+  </div>
+
+  <div class="controls" id="controls">
+    <button class="ctrl pause" id="pauseBtn">Pause</button>
+    <button class="ctrl finish" id="finishBtn">Finish</button>
+    <button class="ctrl quit" id="quitBtn">Quit</button>
+  </div>
+
+  <!-- START -->
+  <div class="overlay" id="startScreen">
+    <!-- LOGO: same "holy-logo.png" file is reused here -->
+    <img class="logo-big" alt="HOLY"
+         src="holy-logo.png"
+         onerror="this.outerHTML='&lt;div class=\'big\'&gt;HOLY&lt;/div&gt;'">
+    <div class="big" style="font-size:38px;margin-top:-2px">MIXMASTER</div>
+    <div class="sub">Sugar-free energy, <b>mixed by you.</b> Stop each pour right on the line for the perfect HOLY.</div>
+    <div class="rules">
+      <b>Tap / click / space</b> to stop the rising mix.<br>
+      Land in the <b style="color:var(--perfect)">green zone</b> = Perfect → combo bonus.<br>
+      Overflow = <b style="color:var(--bad)">spill</b>. Mix as many as you can in <b>60s</b>.
+    </div>
+    <button class="btn" id="startBtn">START MIXING</button>
+    <div class="eco">0 sugar · 0 crash · 0 taurine — just powder &amp; water. Made in Berlin.</div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay hide" id="endScreen">
+    <div class="scorelbl">Final Focus Score</div>
+    <div class="score" id="finalScore">0</div>
+    <div class="statrow">
+      <div>Served<b id="served">0</b></div>
+      <div>Perfect<b id="perfects">0</b></div>
+      <div>Best combo<b id="bestCombo">0</b></div>
+    </div>
+    <div class="sub" id="endMsg"></div>
+    <button class="btn" id="againBtn">MIX AGAIN</button>
+    <div class="eco">Powder beats cans: less packaging, less shipping. Better for you, better for the planet.</div>
+  </div>
+</div>
+
+<script>
+
+(() => {
+  const FLAVORS = [
+    {name:"Tropical Lion", a:"#ffd14d", b:"#ff9d2e"},
+    {name:"Watermelon",    a:"#ff5e7e", b:"#ff3b6b"},
+    {name:"Blue Razz",     a:"#4dc4ff", b:"#2e7bff"},
+    {name:"Peach Iced Tea",a:"#ffb14d", b:"#ff7e3b"},
+    {name:"Wild Berry",    a:"#b46bff", b:"#7c3bff"},
+    {name:"Lime Mojito",   a:"#7cf7c4", b:"#1fd98f"},
+    {name:"Mango Tango",   a:"#ffcb2e", b:"#ff8a1f"},
+    {name:"Cherry Cola",   a:"#ff6b6b", b:"#e03b3b"},
+  ];
+  const PERFECT_MSGS = ["PERFECT!","CLEAN ENERGY!","NO CRASH!","FLOW STATE!","CHEF'S MIX!"];
+
+  const $ = id => document.getElementById(id);
+  const glass=$('glass'), liquid=$('liquid'), targetLine=$('targetLine'), pzone=$('pzone'),
+        flavorEl=$('flavor'), verdict=$('verdict'), scoreVal=$('scoreVal'),
+        timerbar=$('timerbar'), comboEl=$('combo'), hint=$('hint'), scoopEl=$('scoop'), stage=$('stage'),
+        goldtag=$('goldtag'), powder=$('powder'), sachet=$('sachet');
+  const speedDots = document.querySelectorAll('#speedMeter .dot');
+  let pourIv=null;
+
+  const GAME_MS = 60000;
+  let state='idle';        // idle | filling | resolving | over
+  let score=0, combo=0, bestCombo=0, served=0, perfects=0;
+  let fill=0, fillSpeed=0, target=0, tol=0, round=0, golden=false;
+  let endAt=0, startAt=0, raf=null, lastT=0;
+  let paused=false, pausedAt=0;
+
+  function setSpeedMeter(speed){
+    // map ~22..115 %/s onto 5 dots; top dot turns red when very fast
+    const lit = Math.max(1, Math.min(5, Math.round((speed-18)/19)));
+    speedDots.forEach((d,i)=>{
+      d.classList.toggle('on', i<lit);
+      d.classList.toggle('hot', i<lit && i>=4);
+    });
+  }
+
+  function setFlavor(){
+    const f = FLAVORS[Math.floor(Math.random()*FLAVORS.length)];
+    document.documentElement.style.setProperty('--accent', f.a);
+    document.documentElement.style.setProperty('--accent-2', f.b);
+    flavorEl.innerHTML = `<b>${f.name}</b>`;
+  }
+
+  function newOrder(){
+    round++;
+    // ---- difficulty: slow -> fast -> slow -> fast, trending faster overall ----
+    const tprog = startAt ? Math.min(1,(performance.now()-startAt)/GAME_MS) : 0; // 0..1 over the game
+    const base  = 22 + 72*tprog;                       // overall ramp: ~22%/s early -> ~94%/s late
+    const wave  = 0.5 + 0.5*Math.sin(round*0.85);       // pulses each order: slow..fast..slow
+    fillSpeed   = base * (0.55 + 0.75*wave);            // ~0.55x..1.3x of base
+    tol  = Math.max(3, 8 - tprog*4.5);                  // perfect zone narrows as game speeds up
+    target = 46 + Math.random()*40;                     // 46–86 %
+    fill = 0;
+    golden = round>2 && Math.random()<0.16;             // occasional bonus order
+
+    setFlavor();
+    setSpeedMeter(fillSpeed);
+    glass.classList.toggle('golden', golden);
+    goldtag.classList.toggle('show', golden);
+
+    // place visuals in % so they line up exactly with the liquid surface
+    targetLine.style.bottom = target + '%';
+    pzone.style.bottom = (target-tol) + '%';
+    pzone.style.height = (2*tol) + '%';
+    liquid.style.transition='none';
+    liquid.style.height='0%';
+    powder.style.transition='none';
+    powder.style.height='0%';
+    verdict.classList.remove('show');
+
+    // ---- pour ritual: tip the HOLY sachet, drop powder, THEN fill water ----
+    state='pouring';
+    hint.style.opacity=.25;
+    scoopEl.textContent = golden ? 'GOLDEN order · pouring HOLY…' : 'pouring HOLY powder…';
+    playPour(()=>{
+      if(state!=='pouring') return;          // cancelled (quit/finish)
+      state='filling';
+      hint.style.opacity=.55;
+      scoopEl.textContent = golden ? 'GOLDEN order · double points!' : `order #${round} · stop on the line`;
+    });
+  }
+
+  function powderParticle(){
+    const p=document.createElement('div');
+    p.className='pdrop';
+    p.style.left=(50+Math.random()*15)+'%';
+    glass.appendChild(p);
+    setTimeout(()=>p.remove(),600);
+  }
+
+  function playPour(done){
+    if(pourIv){ clearInterval(pourIv); pourIv=null; }
+    sachet.classList.add('pour');
+    let n=0;
+    pourIv=setInterval(()=>{
+      if(state!=='pouring'){ clearInterval(pourIv); pourIv=null; return; }
+      powderParticle(); n++;
+      if(n>=10){ clearInterval(pourIv); pourIv=null; }
+    },42);
+    setTimeout(()=>{ powder.style.transition='height .4s ease'; powder.style.height='8%'; },30);
+    setTimeout(()=>{
+      sachet.classList.remove('pour');
+      setTimeout(done,170);
+    },520);
+  }
+
+  function bubble(){
+    const b=document.createElement('div');
+    b.className='bubble';
+    const s=3+Math.random()*5;
+    b.style.width=b.style.height=s+'px';
+    b.style.left=(12+Math.random()*78)+'%';
+    b.style.bottom='4px';
+    b.style.animationDuration=(0.7+Math.random()*0.8)+'s';
+    glass.appendChild(b);
+    setTimeout(()=>b.remove(),1500);
+  }
+
+  function tick(t){
+    if(!lastT) lastT=t;
+    const dt=(t-lastT)/1000; lastT=t;
+    // timer bar
+    const remain=Math.max(0,endAt-t);
+    timerbar.style.width=(remain/GAME_MS*100)+'%';
+    if(remain<=0){ endGame(); return; }
+
+    if(state==='filling'){
+      fill += fillSpeed*dt;
+      if(Math.random()<0.5) bubble();
+      if(fill>=104){ // overflowed before player stopped
+        resolve(true);
+      } else {
+        liquid.style.height=Math.min(100,fill)+'%';
+      }
+    }
+    raf=requestAnimationFrame(tick);
+  }
+
+  function resolve(autoSpill){
+    if(state!=='filling') return;
+    state='resolving';
+    const over = fill>100 || autoSpill;
+    const diff = Math.abs(fill-target);
+    let msg, color, gain=0;
+
+    if(over){
+      msg="SPILL!"; color="var(--bad)";
+      combo=0;
+      stage.classList.add('shake'); setTimeout(()=>stage.classList.remove('shake'),320);
+    } else if(diff<=tol){
+      perfects++; combo++; bestCombo=Math.max(bestCombo,combo);
+      gain = Math.round((150 + (tol-diff)*12) * (1 + combo*0.25));
+      msg=PERFECT_MSGS[Math.min(PERFECT_MSGS.length-1, combo-1)] || "PERFECT!";
+      color="var(--perfect)";
+      burst();
+    } else {
+      const near = Math.max(0, 1 - (diff-tol)/22);
+      gain = Math.round(40*near);
+      combo=0;
+      msg = near>0.4 ? "Close!" : "Too watery";
+      color="var(--good)";
+    }
+
+    if(golden) gain*=2;
+    score+=gain; served++;
+    scoreVal.textContent=score;
+    verdict.textContent = (golden&&gain?'★ ':'') + msg + (gain? `  +${gain}`:'');
+    verdict.style.color=color;
+    verdict.classList.add('show');
+
+    if(combo>=2){ comboEl.textContent=`COMBO ×${combo}`; comboEl.classList.add('show'); }
+    else comboEl.classList.remove('show');
+
+    liquid.style.transition='height .25s ease';
+    if(over) liquid.style.height='100%';
+
+    // serve & next
+    setTimeout(()=>{
+      liquid.style.transition='height .3s cubic-bezier(.6,0,.2,1)';
+      liquid.style.height='0%';
+      setTimeout(()=>{ if(state!=='over') newOrder(); }, 280);
+    }, over?520:600);
+  }
+
+  function burst(){
+    for(let i=0;i<14;i++){
+      const b=document.createElement('div');
+      b.className='bubble';
+      const s=4+Math.random()*7;
+      b.style.width=b.style.height=s+'px';
+      b.style.left=(20+Math.random()*60)+'%';
+      b.style.bottom=(40+Math.random()*40)+'%';
+      b.style.background='var(--perfect)';
+      b.style.animationDuration=(0.5+Math.random()*0.5)+'s';
+      glass.appendChild(b);
+      setTimeout(()=>b.remove(),1100);
+    }
+  }
+
+  function press(e){
+    if(e){ e.preventDefault(); }
+    if(paused) return;
+    if(state==='filling'){ resolve(false); }
+  }
+
+  function setPaused(p){
+    if(state==='over') return;
+    paused=p;
+    const btn=$('pauseBtn');
+    if(p){
+      pausedAt=performance.now();
+      if(raf){ cancelAnimationFrame(raf); raf=null; }
+      btn.textContent='Resume'; btn.classList.add('on');
+      hint.textContent='Paused';
+    } else {
+      const delta=performance.now()-pausedAt;   
+      endAt+=delta; startAt+=delta; lastT=0;
+      btn.textContent='Pause'; btn.classList.remove('on');
+      hint.textContent='tap / space to stop the pour';
+      if(!raf) raf=requestAnimationFrame(tick);
+    }
+  }
+  function togglePause(){ if(state==='filling'||state==='resolving'||paused) setPaused(!paused); }
+
+  function startGame(){
+    score=0;combo=0;bestCombo=0;served=0;perfects=0;round=0;
+    scoreVal.textContent='0';
+    comboEl.classList.remove('show');
+    $('startScreen').classList.add('hide');
+    $('endScreen').classList.add('hide');
+    $('controls').classList.add('show');
+    paused=false; $('pauseBtn').textContent='Pause'; $('pauseBtn').classList.remove('on');
+    hint.textContent='tap / space to stop the pour';
+    endAt = performance.now()+GAME_MS;
+    startAt = performance.now();
+    lastT=0;
+    newOrder();
+    if(raf) cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(tick);
+  }
+
+  function endGame(){
+    state='over';
+    paused=false;
+    if(pourIv){ clearInterval(pourIv); pourIv=null; }
+    sachet.classList.remove('pour');
+    if(raf) cancelAnimationFrame(raf);
+    timerbar.style.width='0%';
+    $('finalScore').textContent=score;
+    $('served').textContent=served;
+    $('perfects').textContent=perfects;
+    $('bestCombo').textContent=bestCombo;
+    let m;
+    if(score>=2200) m="Elite mixologist. HOLY HQ wants a word. 🏆";
+    else if(score>=1200) m="Smooth, sustained, zero crash. Strong run!";
+    else if(score>=500) m="Solid pour. Dial in those perfects.";
+    else m="Warm-up done — go again for the combo streak.";
+    $('endMsg').textContent=m;
+    $('controls').classList.remove('show');
+    $('endScreen').classList.remove('hide');
+  }
+
+  function quitGame(){
+    state='over';
+    paused=false;
+    if(pourIv){ clearInterval(pourIv); pourIv=null; }
+    sachet.classList.remove('pour');
+    if(raf) cancelAnimationFrame(raf);
+    timerbar.style.width='100%';
+    comboEl.classList.remove('show');
+    goldtag.classList.remove('show');
+    glass.classList.remove('golden');
+    liquid.style.transition='height .25s ease';
+    liquid.style.height='0%';
+    powder.style.height='0%';
+    verdict.classList.remove('show');
+    $('controls').classList.remove('show');
+    $('endScreen').classList.add('hide');
+    $('startScreen').classList.remove('hide');
+  }
+
+  // input
+  window.addEventListener('pointerdown', press, {passive:false});
+  window.addEventListener('keydown', e=>{
+    if(e.code==='Space'){ press(e); }
+    if(e.code==='KeyP' || e.code==='Escape'){ e.preventDefault(); togglePause(); }
+  });
+  $('startBtn').addEventListener('pointerdown', e=>{e.stopPropagation();e.preventDefault();startGame();});
+  $('againBtn').addEventListener('pointerdown', e=>{e.stopPropagation();e.preventDefault();startGame();});
+  $('finishBtn').addEventListener('pointerdown', e=>{e.stopPropagation();e.preventDefault(); if(state!=='over') endGame();});
+  $('quitBtn').addEventListener('pointerdown', e=>{e.stopPropagation();e.preventDefault(); quitGame();});
+  $('pauseBtn').addEventListener('pointerdown', e=>{e.stopPropagation();e.preventDefault(); togglePause();});
+})();
+
+</script>
+</body>
+</html>
